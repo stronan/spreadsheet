@@ -22,7 +22,7 @@ function runTests() {
     test(null, () => nameToColIndex("AZ12"), 51)
     test(null, () => parseRange("Z1:AB2"), ["Z1", "AA1", "AB1", "Z2", "AA2", "AB2"])
     test(null, () => parseFormula("A1-C2"), "fn: (a, b) => a - b, args: A1,C2")
-    test(null, () => parseFormula("sum(A1:B2)"), "fn: (a, b) => a - b, args: A1,B1,A2,B2")
+    test(null, () => parseFormula("sum(A1:B2)"), "fn: (...args) => args.reduce((a, v) => a + v, 0), args: A1,B1,A2,B2")
     test("Resolve formula", () => {
         getCell("A1").set("2")
         getCell("B1").set("3")
