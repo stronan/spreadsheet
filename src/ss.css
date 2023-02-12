@@ -1,0 +1,20 @@
+.row {
+    border-left: 1px solid gray;
+    display: flex;
+    flex-direction: row;
+    min-height: 20px;
+}
+
+.row.heading {
+    border-top: 1px solid gray;
+}
+
+.cell {
+    border-right: 1px solid gray;
+    border-bottom: 1px solid gray;
+    min-width: 48px;
+}
+
+input {
+    width: 48px;
+}
