@@ -29,6 +29,8 @@ function runTests() {
         return getCell("C1").set("=A1 + B1").render()
     }, 5)
     test("Parse error", () => getCell("C1").set("=A1 +").render(), "#Error")
+
+    // TODO: need more error tests, e.g. invalid reference, summing missing values
 }
 
 runTests()

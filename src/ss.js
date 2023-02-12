@@ -6,12 +6,9 @@
  * A cell in the spreadsheet.
  */
 class Cell {
-    constructor(name, value) {
+    constructor(name) {
         this.name = name
-        this.input = value
-        this.value = null
-        this.formula = null
-        this.parseError = null
+        this.formats = new Set()
     }
 
     set(input) {
@@ -19,7 +16,10 @@ class Cell {
         // TODO: try converting to number first
         // TODO: proper number/string handling
         this.input = input
-        if (input.startsWith("=")) {
+        this.value = null
+        this.formula = null
+        this.parseError = null
+        if (input && input.startsWith("=")) {
             this.formula = parseFormula(input.slice(1))
             if (!this.formula) {
                 this.parseError = "#Error"
@@ -31,6 +31,21 @@ class Cell {
             }
         }
         return this
+    }
+
+    changed() {
+        // TODO: potential optimisation: don't render everything, make cell.set() declare a dependency on each of
+        //       its arguments, then only render this and dependents
+        renderAll()
+    }
+
+    toggleFormat(type) {
+        if (this.formats.delete(type)) {
+            console.log("Cleared", type)
+        } else {
+            this.formats.add(type)
+            console.log("Set", type)
+        }
     }
 
     resolve() {
@@ -68,7 +83,8 @@ let sheet = new Map
 const NUM_ROWS = 100
 const NUM_COLS = 100
 
-let editCell
+let selectedCell
+let editing = false
 
 const first = "A".charCodeAt(0)
 
@@ -151,6 +167,9 @@ const parseFormula = formula => {
     if (parts) {
         let fn
         switch (parts[1]) {
+            case "avg":
+                fn = (...args) => args.reduce((a, v) => a + v, 0) / args.length
+                break
             case "sum":
                 fn = (...args) => args.reduce((a, v) => a + v, 0)
                 break
@@ -166,14 +185,14 @@ const parseFormula = formula => {
 const range = size => [...Array(size).keys()]
 
 const cancelEdit = () => {
-    if (editCell) {
-        editCell.removeChild(editCell.lastElementChild)
-        editCell = null
+    if (editing) {
+        selectedCell.removeChild(selectedCell.lastElementChild)
+        editing = false
     }
 }
 
 const getCell = id => {
-    const cell = sheet.get(id) || new Cell(id, null)
+    const cell = sheet.get(id) || new Cell(id)
     sheet.set(id, cell)
     return cell
 }
@@ -184,33 +203,68 @@ const cellEditKey = ev => {
             cancelEdit()
             break
         case "Enter":
-            const cell = getCell(editCell.id)
-            cell.set(editCell.lastElementChild.value)
+            const cell = getCell(selectedCell.id)
+            cell.set(selectedCell.lastElementChild.value)
+            // TODO: should really remove cell if there's nothing in it (or have a way to delete it)
             cancelEdit()
-            // TODO: don't render everything
-            renderAll()
+            cell.changed()
             break
+    }
+    return false
+}
+
+const applyFormat = (cellId, format) => {
+    const cell = getCell(cellId)
+    cell.toggleFormat(format)
+    renderCell(cell)
+}
+
+const cellKey = (ev) => {
+    if (ev.ctrlKey) {
+        switch (ev.key) {
+            case "b":
+                applyFormat(selectedCell.id, "bold")
+                break
+            case "i":
+                applyFormat(selectedCell.id, "italic")
+                break
+            case "y":
+                // TODO: work out if it's possible to capture Ctrl-U, i.e. stop the browser using it
+                applyFormat(selectedCell.id, "underline")
+                break
+        }
     }
 }
 
-function toggleEdit(target) {
-    if (target.className !== "cell") {
+function selectCell(target) {
+    const cell = target.nodeName === "SPAN" ? target.parentElement : target
+    if (!cell.classList.contains("cell") || cell.classList.contains("heading")) {
+        // TODO: clicking heading could select the whole row/column
         return
     }
-    cancelEdit()
-    // if (editCell) {
-    //     if (editCell === target) {
-    //         return
-    //     }
-    //     editCell.removeChild(editCell.lastElementChild)
-    // }
-    editCell = target
-    // TODO: edit existing SS cell
-    const input = document.createElement("input")
-    input.setAttribute("placeholder", "value")
-    input.setAttribute("autofocus", "true")
-    input.onkeyup = cellEditKey
-    target.append(input)
+    if (cell === selectedCell) {
+        startEdit()
+    } else {
+        cancelEdit()
+        if (selectedCell) {
+            selectedCell.className = "cell"
+        }
+        selectedCell = cell
+        selectedCell.className = "cell selected"
+    }
+}
+
+function startEdit() {
+    if (!editing) {
+        // TODO: edit existing SS cell - don't really want to see existing value while editing
+        const input = document.createElement("input")
+        input.setAttribute("placeholder", "value")
+        input.setAttribute("autofocus", "true")
+        input.setAttribute("value", sheet.get(selectedCell.id)?.input || "")
+        input.onkeyup = cellEditKey
+        selectedCell.append(input)
+    }
+    editing = true
 }
 
 function newCell(cssClass, id) {
@@ -245,7 +299,8 @@ function drawGrid(grid) {
 
     grid.append(headingRow)
     grid.append(...range(NUM_ROWS).map(newRow))
-    grid.onclick = (e) => toggleEdit(e.target)
+    grid.onclick = (e) => selectCell(e.target)
+    document.onkeyup = cellKey
 }
 
 const clearCell = (r, c) => {
@@ -255,6 +310,7 @@ const clearCell = (r, c) => {
 
 /**
  * Clear all cells in the grid.
+ * TODO: potential optimisation: traverse the DOM tree to clear elements, rather than using getElementById
  */
 const clearAll = () =>
     range(NUM_ROWS).forEach(r =>
@@ -265,7 +321,10 @@ const renderCell = cell => {
     console.log("Rendering cell", cell)
     const ref = document.getElementById(cell.name)
     ref.childNodes.forEach(n => ref.removeChild(n))
-    ref.appendChild(document.createTextNode(cell.render()))
+    let text = document.createElement("span")
+    text.append(cell.render())
+    text.setAttribute("class", Array.from(cell.formats).join(" "))
+    ref.appendChild(text)
 }
 
 /**

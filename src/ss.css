@@ -15,6 +15,28 @@
     min-width: 48px;
 }
 
+.selected {
+    background-color: lightblue;
+}
+
+.cell.heading {
+    text-align: center;
+    font-weight: bold;
+    background-color: lightgrey;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.italic {
+    font-style: italic;
+}
+
+.underline {
+    text-decoration: underline;
+}
+
 input {
     width: 48px;
 }
